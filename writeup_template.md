@@ -1,9 +1,4 @@
-## Writeup Template
-### You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
-
----
-
-**Vehicle Detection Project**
+# Vehicle Detection Project
 
 The goals / steps of this project are the following:
 
@@ -16,87 +11,101 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 [image1]: ./examples/car_not_car.png
-[image2]: ./examples/HOG_example.jpg
-[image3]: ./examples/sliding_windows.jpg
-[image4]: ./examples/sliding_window.jpg
-[image5]: ./examples/bboxes_and_heat.png
-[image6]: ./examples/labels_map.png
-[image7]: ./examples/output_bboxes.png
-[video1]: ./project_video.mp4
-
-## [Rubric](https://review.udacity.com/#!/rubrics/513/view) Points
-### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
+[image2]: ./examples/hog_car.png
+[image3]: ./examples/hog_non_car.png
+[image4]: ./examples/search_region_1.png
+[image5]: ./examples/search_region_2.png
+[image6]: ./examples/pipeline_output_1.png
+[image7]: ./examples/pipeline_output_2.png
+[image8]: ./examples/pipeline_output_3.png
+[video1]: ./project_video_ouput.mp4
 
 ---
-### Writeup / README
-
-#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  [Here](https://github.com/udacity/CarND-Vehicle-Detection/blob/master/writeup_template.md) is a template writeup for this project you can use as a guide and a starting point.  
-
-You're reading it!
-
 ### Histogram of Oriented Gradients (HOG)
 
 #### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The code for this step is contained in the first code cell of the IPython notebook (or in lines # through # of the file called `some_file.py`).  
+The training pipeline can be found in the IPython notebook called TrainClassifier.ipynb.
 
-I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
+I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of images contained in both classes:
 
 ![alt text][image1]
 
-I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
+I then built a pipeline to explore different parameters for color binning, color histogram and HOG features (cell 4 of the notebook).
 
-Here is an example using the `YCrCb` color space and HOG parameters of `orientations=8`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
+Eventually, I ended up not using color binning and color histogram, since HOG features alone worked good enough, and color-based features had a detrimental effect on detecting one of the cars in the project video.
 
+Here is an example of HOG features using the `YUV` color space for a car and a non-car image:
 
 ![alt text][image2]
 
+![alt text][image3]
+
 #### 2. Explain how you settled on your final choice of HOG parameters.
 
-I tried various combinations of parameters and...
+I relied on RandomizedSearchCV in finding the parameters for HOG features (cell 4-8 of the TrainClassifier notebook).
+
+The final choice of parameters was: `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(3, 3)`.
 
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
-I trained a linear SVM using...
+First I started with LinearSVC, but I soon figured out that GradientBoostingClassifier outperforms LinearSVC in terms of both training speed and accuracy, so I switched to using GradientBoostingClassifier.
+ 
+I tweaked the parameters for the classifier pipeline using code in cell 4 of the `TrainClassifier` notebook.
+
+Finally, I've chosen the best performing set of parameters according to the cross-validation results and trained a classifier for that set of parameters (cell 4-8 of the TrainClassifier notebook).
 
 ### Sliding Window Search
 
 #### 1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
-I decided to search random window positions at random scales all over the image and came up with this (ok just kidding I didn't actually ;):
+I chose a set of window sizes: `32x32`, `48x48`, `64x64`, `96x96`, `128x128`, `160x160`.
+For each of those sizes, I visualized a grid over the entire image and highlighted positive classifier predictions in green.
+After that, I've chosen a portion of the image where all the relevant matches were located, and changed the code to only run over that image portion.
 
-![alt text][image3]
+Here are some of the results of that process:
+
+![alt text][image4]
+
+![alt text][image5]
+
+Code and more image examples can be seen in the cell 2 of the Visuals notebook.
+ 
+The implementation above slides through all the windows independently. The final implementation of sliding windows for video processing is different, since it uses HOG subsampling, and also resizes the search area so that the windows are `64x64` pixels, same as training set images. The optimized implementation can be found in the function called `find_bounding_boxes` in `tools.py`.  
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
-Ultimately I searched on two scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
+Ultimately I searched on 5 window scales using YUV 3-channel HOG features.  Here are some example images (cell 4 in the `Visuals` notebook):
 
-![alt text][image4]
+![alt text][image6]
+![alt text][image7]
+![alt text][image8]
+
+The final pipeline used for processing the video is optimized by only evaluating HOG features once for the entire image and subsampling them later. Obtaining HOG features is a very computationally expensive step.
+
 ---
 
 ### Video Implementation
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./project_video_output.mp4)
 
 
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
-I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
+I recorded the positions of positive detections in each frame of the video.  
 
-Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
+From the positive detections I created a heatmap. Every window contributes to the heatmap, but the weight contributed is inversely proportional to the window size, since I assume that bigger windows have less confidence about the actual location of the car. Every individual heatmap is thresholded to reduce the effect of bigger, single windows. 
 
-### Here are six frames and their corresponding heatmaps:
+After that I averaged the heatmaps across the last 6 frames and thresholded the average heatmap to reject spurious false positives.
 
-![alt text][image5]
+I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.
+  
+When doing this, I preferred to err towards having less false positives. This leads to the bounding boxes being smaller than the cars, especially when seen from the side.
 
-### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
+Images shown above display per-frame heatmaps and resulting bounding boxes, like this:
+
 ![alt text][image6]
-
-### Here the resulting bounding boxes are drawn onto the last frame in the series:
-![alt text][image7]
-
-
 
 ---
 
@@ -104,5 +113,9 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The biggest issue I had with this project is that the training set seems to be sufficiently different from the recorded video, so that the white car in the project video fails to be detected by color-based features. Because of that reason, even when the classifier shows accuracy of over 99%, this number cannot be relied on.
+
+I think that in order to make the classifier more robust, this project needs much bigger datasets (e.g. by incorporating the Udacity dataset, etc.). Otherwise different small changes that make test videos different from the training set will cause the pipeline to break.
+
+Same as with another projects in this nanodegree, reviewing the result of the program manually takes time and doesn't guarantee measurable improvement. I think that in an actual enterprise setting, it would make sense to build some sort of automated evaluation mechanism, so that the quality of the entire video processing pipeline can be systematically evaluated.
 
